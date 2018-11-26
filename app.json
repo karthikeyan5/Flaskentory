@@ -1,0 +1,22 @@
+{
+    "name": "Flaskentory",
+    "description": "An Inventory Management Web Application made with Flask and PostgreSQL",
+    "keywords": [
+      "flask",
+      "python",
+      "sample",
+      "PostgreSQL"
+    ],
+    "repository": "https://github.com/karthikeyan5/Flaskentory.git",
+    "addons": [
+      "heroku-postgresql"
+    ],
+    "env": {
+      "IS_PRODUCTION" : {
+        "value": true
+      },
+      "IS_DEMO" : {
+        "value": true
+      }
+    }
+  }
