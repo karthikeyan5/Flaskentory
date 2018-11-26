@@ -18,8 +18,7 @@ app.config['FLASK_ADMIN_SWATCH'] = 'lumen'
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     'DATABASE_URL', 'postgresql://root:toor@localhost/flaskentory')
 app.config['SQLALCHEMY_ECHO'] = not (app.config['is_production'])
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = not (
-    app.config['is_production'])
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 db = SQLAlchemy(app)
 
 
@@ -39,11 +38,16 @@ class ModelViewProduct(ModelView):
     form_excluded_columns = ['time_created', 'time_updated']
     form_args = {
         'name': {
-            'label': 'Product Name',
-            'validators': [validators.DataRequired()]
+            'label': 'Product Name'
         },
         'description': {
             'label': 'Product Description'
+        }
+    }
+    form_widget_args = {
+    'description': {
+        'rows': 10,
+        'style': 'color: black'
         }
     }
 
@@ -63,25 +67,41 @@ class ModelViewLocation(ModelView):
     form_excluded_columns = ['time_created', 'time_updated']
     form_args = {
         'name': {
-            'label': 'Location Name',
-            'validators': [validators.DataRequired()]
+            'label': 'Location Name'
         },
         'other_details': {
             'label': 'Other Details'
         }
     }
+    form_widget_args = {
+    'other_details': {
+        'rows': 10,
+        'style': 'color: black'
+        }
+    }
+
+
+class ModelViewProductMovement(ModelView):
+    can_delete = False
+    can_view_details = True
+    can_export = True
+    export_types = ['csv', 'xls']
+    page_size = 20
+    column_exclude_list = ['time_created', 'time_updated']
+    column_editable_list = ['qty', 'product','from_location','to_location','movement_date']
+    form_excluded_columns = ['time_created', 'time_updated']
 
 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True)
-    description = db.Column(db.String(1000))
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.TEXT)
     time_created = db.Column(db.TIMESTAMP, server_default=db.func.now())
     time_updated = db.Column(
         db.TIMESTAMP, onupdate=db.func.now(), server_default=db.func.now())
 
     def __str__(self):
-        return "{}, {}".format(self.name)
+        return "{}".format(self.name)
 
     def __repr__(self):
         return "{}: {}".format(self.id, self.__str__())
@@ -89,24 +109,45 @@ class Product(db.Model):
 
 class Location(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True)
-    other_details = db.Column(db.String(1000))
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    other_details = db.Column(db.TEXT)
     time_created = db.Column(db.TIMESTAMP, server_default=db.func.now())
     time_updated = db.Column(
         db.TIMESTAMP, onupdate=db.func.now(), server_default=db.func.now())
 
     def __str__(self):
-        return "{}, {}".format(self.name)
+        return "{}".format(self.name)
 
     def __repr__(self):
         return "{}: {}".format(self.id, self.__str__())
 
 
+class ProductMovement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    movement_date = db.Column(db.Date, server_default=db.func.now())
+    from_location_id = db.Column(db.Integer(), db.ForeignKey(Location.id))
+    to_location_id = db.Column(db.Integer(), db.ForeignKey(Location.id))
+    product_id = db.Column(
+        db.Integer(), db.ForeignKey(Product.id), nullable=False)
+    from_location = db.relationship(Location, foreign_keys=[from_location_id])
+    to_location = db.relationship(Location, foreign_keys=[to_location_id])
+    product = db.relationship(Product, foreign_keys=[product_id])
+    qty = db.Column(db.Integer(), nullable=False)
+    time_created = db.Column(db.TIMESTAMP, server_default=db.func.now())
+    time_updated = db.Column(
+        db.TIMESTAMP, onupdate=db.func.now(), server_default=db.func.now())
+
+
 admin = Admin(app, name='Inventory Management',
               template_mode='bootstrap3', url='/')
+admin.add_view(ModelViewProductMovement(
+    ProductMovement, db.session, name='Product Movement'))
 admin.add_view(ModelViewProduct(Product, db.session, category="Master"))
 admin.add_view(ModelViewLocation(Location, db.session, category="Master"))
 
+@app.route('/favicon.ico')
+def favicon():
+    return redirect(url_for('static', filename='favicon.ico'))
 
 def create_demo_data():
     products_demo_data = [
@@ -164,6 +205,40 @@ def create_demo_data():
         location.other_details = demo_location['other_details']
         db.session.add(location)
 
+    movement_demo_data = [
+        ["2017-06-08", None,	1,	    2,	12],
+        ["2017-06-08", None,	2,	    1,	9],
+        ["2017-06-08", None,	3,	    1,	4],
+        ["2017-06-08", None,	3,	    1,	7],
+        ["2017-06-08", None,	1,	    12,	20],
+        ["2017-06-08", None,	3,	    3,	13],
+        ["2017-06-08", None,	2,	    9,	2],
+        ["2017-06-08", None,	1,	    11,	4],
+        ["2017-06-08", None,	3,	    6,	5],
+        ["2017-09-13", 1,	    4,	    12,	2],
+        ["2017-10-12", 1,	    5,	    12,	3],
+        ["2017-10-22", 2,	    7,	    1,	6],
+        ["2017-11-27", 3,	    6,	    1,	5],
+        ["2018-12-27", 1,	    3,	    2,	4],
+        ["2018-01-09", 7,	    None,	1,	2],
+        ["2018-03-07", 6,	    None,	1,	2],
+        ["2018-05-31", 3,	    5,	    3,	3],
+        ["2018-06-11", 1,	    6,	    12,	3],
+        ["2018-07-24", 1,	    4,	    2,	6],
+        ["2018-07-28", 3,	    None,	6,	2],
+        ["2018-07-31", 4,	    None,	2,	2],
+        ["2018-11-25", 4,	    5,	    2,	3]
+        ]
+
+    for demo_movement in movement_demo_data:
+        product_movement = ProductMovement()
+        product_movement.movement_date = demo_movement[0]
+        product_movement.from_location_id = demo_movement[1]
+        product_movement.to_location_id = demo_movement[2]
+        product_movement.product_id = demo_movement[3]
+        product_movement.qty = demo_movement[4]
+        db.session.add(product_movement)
+
     db.session.commit()
 
     return
@@ -175,4 +250,4 @@ if __name__ == "__main__":
         db.create_all()
         create_demo_data()
     debug = not (app.config['is_production'])
-    app.run(debug=True)
+    app.run(debug=debug)
