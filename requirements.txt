@@ -7,6 +7,7 @@ et-xmlfile==1.0.1
 Flask==1.0.2
 Flask-Admin==1.5.2
 Flask-SQLAlchemy==2.3.2
+gunicorn==19.9.0
 isort==4.3.4
 itsdangerous==1.1.0
 jdcal==1.4

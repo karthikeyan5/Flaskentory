@@ -9,7 +9,9 @@
     ],
     "repository": "https://github.com/karthikeyan5/Flaskentory.git",
     "addons": [
-      "heroku-postgresql"
+      {
+        "plan": "heroku-postgresql",
+      }
     ],
     "env": {
       "IS_PRODUCTION" : {
