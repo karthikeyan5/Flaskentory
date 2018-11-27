@@ -20,8 +20,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
 app.config['SQLALCHEMY_ECHO'] = not (app.config['is_production'])
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 db = SQLAlchemy(app)
+engine = db.create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
 
-
+# customs views
 class ModelViewProduct(ModelView):
     can_delete = False
     can_view_details = True
@@ -45,12 +46,11 @@ class ModelViewProduct(ModelView):
         }
     }
     form_widget_args = {
-    'description': {
-        'rows': 10,
-        'style': 'color: black'
+        'description': {
+            'rows': 10,
+            'style': 'color: black'
         }
     }
-
 
 class ModelViewLocation(ModelView):
     can_delete = False
@@ -74,24 +74,93 @@ class ModelViewLocation(ModelView):
         }
     }
     form_widget_args = {
-    'other_details': {
-        'rows': 10,
-        'style': 'color: black'
+        'other_details': {
+            'rows': 10,
+            'style': 'color: black'
         }
     }
 
-
 class ModelViewProductMovement(ModelView):
     can_delete = False
+    can_edit = False
     can_view_details = True
     can_export = True
-    export_types = ['csv', 'xls']
+    export_types = ['csv']
     page_size = 20
+    can_set_page_size = True
     column_exclude_list = ['time_created', 'time_updated']
-    column_editable_list = ['qty', 'product','from_location','to_location','movement_date']
+    column_editable_list = ['qty']
     form_excluded_columns = ['time_created', 'time_updated']
 
+    def on_model_change(self, form, model, is_created):
+        if is_created:
+            conn = engine.connect()
+            trans = conn.begin()
+            if form.to_location.data:
+                select_st = db.text(
+                    'SELECT * FROM product_stock WHERE location_id = :l AND product_id = :p')
+                res = conn.execute(
+                    select_st, p=form.product.data.id, l=form.to_location.data.id)
+                row_to = res.fetchone()
+                if row_to:
+                    q = db.text(
+                        'UPDATE product_stock SET available_stock = product_stock.available_stock + (1*:qty) WHERE id = :id')
+                    conn.execute(q, qty=form.qty.data, id=row_to.id)
+                else:
+                    q = db.text(
+                        'INSERT INTO product_stock (location_id, product_id, available_stock) VALUES (:l,:p,:qty)')
+                    conn.execute(
+                        q, qty=form.qty.data, l=form.to_location.data.id, p=form.product.data.id)
+            elif form.from_location.data:
+                select_st = db.text(
+                    'SELECT * FROM product_stock WHERE location_id = :l AND product_id = :p')
+                res = conn.execute(
+                    select_st, p=form.product.data.id, l=form.from_location.data.id)
+                row_from = res.fetchone()
+                if row_from:
+                    q = db.text(
+                        'UPDATE product_stock SET available_stock = product_stock.available_stock + (1*:qty) WHERE id = :id')
+                    conn.execute(q, qty=-form.qty.data, id=row_from.id)
+                else:
+                    q = db.text(
+                        'INSERT INTO product_stock (location_id, product_id, available_stock) VALUES (:l,:p,:qty)')
+                    conn.execute(
+                        q, qty=-form.qty.data, l=form.from_location.data.id, p=form.product.data.id)
+            else:
+                conn.close()
+                raise ValidationError('Both from and to cannot be empty')
+            trans.commit()
+            conn.close()
+        else:
+            conn = engine.connect()
+            trans = conn.begin()
+            select_st = db.select([ProductMovement]).where(
+                ProductMovement.id == model.list_form_pk)
+            res = conn.execute(select_st)
+            row = res.fetchone()
+            q = db.text(
+                'UPDATE product_stock SET available_stock = product_stock.available_stock + (1*:qty) WHERE location_id = :l AND product_id = :p')
+            if row.from_location_id:
+                conn.execute(q, qty=(int(row.qty)-int(form.qty.data)),
+                             l=row.from_location_id, p=row.product_id)
+            if row.to_location_id:
+                conn.execute(q, qty=(int(form.qty.data)-int(row.qty)),
+                             l=row.to_location_id, p=row.product_id)
+            trans.commit()
+            conn.close()
 
+class ModelViewProductStock(ModelView):
+    can_delete = False
+    can_edit = False
+    can_create = False
+    column_exclude_list = ['time_created', 'time_updated']
+    column_sortable_list = ('available_stock', )
+    column_default_sort = 'product_id'
+    page_size = 20
+    can_export = True
+    export_types = ['csv']
+
+# db model
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
@@ -105,7 +174,6 @@ class Product(db.Model):
 
     def __repr__(self):
         return "{}: {}".format(self.id, self.__str__())
-
 
 class Location(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -121,7 +189,6 @@ class Location(db.Model):
     def __repr__(self):
         return "{}: {}".format(self.id, self.__str__())
 
-
 class ProductMovement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     movement_date = db.Column(db.Date, server_default=db.func.now())
@@ -132,23 +199,46 @@ class ProductMovement(db.Model):
     from_location = db.relationship(Location, foreign_keys=[from_location_id])
     to_location = db.relationship(Location, foreign_keys=[to_location_id])
     product = db.relationship(Product, foreign_keys=[product_id])
-    qty = db.Column(db.Integer(), nullable=False)
+    qty = db.Column(db.Integer(), db.CheckConstraint(
+        'qty >= 0'), nullable=False)
     time_created = db.Column(db.TIMESTAMP, server_default=db.func.now())
     time_updated = db.Column(
         db.TIMESTAMP, onupdate=db.func.now(), server_default=db.func.now())
+
+    def __str__(self):
+        return "{}".format(self.id)
+
+class ProductStock(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    location_id = db.Column(db.Integer, db.ForeignKey(Location.id))
+    product_id = db.Column(db.Integer, db.ForeignKey(Product.id))
+    available_stock = db.Column(db.Integer, db.CheckConstraint(
+        'available_stock>=0'), nullable=False)
+    location = db.relationship(Location, foreign_keys=[location_id])
+    product = db.relationship(Product, foreign_keys=[product_id])
+    time_created = db.Column(db.TIMESTAMP, server_default=db.func.now())
+    time_updated = db.Column(
+        db.TIMESTAMP, onupdate=db.func.now(), server_default=db.func.now())
+    db.UniqueConstraint('location_id', 'product_id',
+                        name='product_stock_location_id_product_id_uindex')
 
 
 admin = Admin(app, name='Inventory Management',
               template_mode='bootstrap3', url='/')
 admin.add_view(ModelViewProductMovement(
     ProductMovement, db.session, name='Product Movement'))
+admin.add_view(ModelViewProductStock(
+    ProductStock, db.session, name='Product Stock'))
 admin.add_view(ModelViewProduct(Product, db.session, category="Master"))
 admin.add_view(ModelViewLocation(Location, db.session, category="Master"))
+
 
 @app.route('/favicon.ico')
 def favicon():
     return redirect(url_for('static', filename='favicon.ico'))
 
+
+# init demo data
 def create_demo_data():
     products_demo_data = [
         {'name': 'PSLV-3S', 'description': 'Polar Satellite Launch Vehicle'},
@@ -171,7 +261,6 @@ def create_demo_data():
         # {'name': '', 'description': ''},
         # {'name': '', 'description': ''},
     ]
-
     for demo_product in products_demo_data:
         product = Product()
         product.name = demo_product['name']
@@ -198,7 +287,6 @@ def create_demo_data():
         # {'name':'', 'other_details': ''},
         # {'name':'', 'other_details': ''},
     ]
-
     for demo_location in location_demo_data:
         location = Location()
         location.name = demo_location['name']
@@ -228,8 +316,7 @@ def create_demo_data():
         ["2018-07-28", 3,	    None,	6,	2],
         ["2018-07-31", 4,	    None,	2,	2],
         ["2018-11-25", 4,	    5,	    2,	3]
-        ]
-
+    ]
     for demo_movement in movement_demo_data:
         product_movement = ProductMovement()
         product_movement.movement_date = demo_movement[0]
@@ -239,12 +326,38 @@ def create_demo_data():
         product_movement.qty = demo_movement[4]
         db.session.add(product_movement)
 
+    product_stock_demo_data = [
+        [1,	2,	2, ],
+        [1,	11,	4, ],
+        [1,	12,	12, ],
+        [2,	1,	3, ],
+        [2,	9,	2, ],
+        [3,	1,	6, ],
+        [3,	2,	4, ],
+        [3,	3,	10, ],
+        [3,	6,	3, ],
+        [4,	2,	1, ],
+        [4,	12,	2, ],
+        [5,	2,	3, ],
+        [5,	3,	3, ],
+        [5,	12,	3, ],
+        [6,	1,	3, ],
+        [6,	12,	3, ],
+        [7,	1,	4, ]
+    ]
+    for demo_product_stock in product_stock_demo_data:
+        product_stock = ProductStock()
+        product_stock.location_id = demo_product_stock[0]
+        product_stock.product_id = demo_product_stock[1]
+        product_stock.available_stock = demo_product_stock[2]
+        db.session.add(product_stock)
+    
     db.session.commit()
-
     return
 
 
 if __name__ == "__main__":
+    # create demo data if demo flag set
     if app.config['demo']:
         db.drop_all()
         db.create_all()

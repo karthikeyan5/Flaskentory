@@ -1,0 +1,38 @@
+{% extends 'admin/master.html' %}
+
+{% block body %}
+
+<div class="jumbotron">
+  <div class="container">
+    <h1 id="inventory-management-web-application">Spaceship Inventory Management</h1>
+    <p>A web application using Flask framework to manage inventory of a list of products in
+      respective warehouses.</p>
+    <p>
+      In this Demo a Spaceship wholesaler uses it to keep track of their inventory around various locations in the
+      world.
+    </p>
+  </div>
+</div>
+<div class="container">
+  <div class="jumbotron">
+    <h2 id="views">Views:</h2>
+    <ul>
+      <li><a href="/product/">Add/Edit/View Product</a></li>
+      <li><a href="/location/">Add/Edit/View Location</a></li>
+      <li><a href="/productmovement/">Add/Edit/View ProductMovement</a></li>
+    </ul>
+
+    <h2 id="report">Report:</h2>
+    <ul>
+      <li><a href="/productstock/">Balance quantity in each location</a></li>
+    </ul>
+  </div>
+</div>
+
+<footer style="padding-top: 130px;padding-bottom: 0px;">
+  <p>
+    Developed by: Karthikeyan S<br>
+    Github: <a tabindex="-1" href="https://github.com/karthikeyan5/Flaskentory">
+      karthikeyan5/Flaskentory</a>.</p>
+</footer>
+{% endblock %}
