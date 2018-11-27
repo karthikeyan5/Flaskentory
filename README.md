@@ -5,7 +5,7 @@ An Inventory Management Web Application made with [Flask](http://flask.pocoo.org
 Visit https://flaskentory.herokuapp.com/ for live version of the application.
 
 ### Instruction to install and run the application.
-1. Install node.
+1. Install python3.7.
 2. Download this repository by using `git clone https://github.com/karthikeyan5/Flaskentory.git`.
 3. Install the dependencies using `cd Flaskentory && python3.7 -m venv venv && source venv/bin/activate && pip install -r requirements.txt`.
 4. Set environment `DATABASE_URL` to you PostgreSQL DB. 
@@ -31,4 +31,4 @@ This view helps to make data entry of product movement:
 The reports are shown below.
 - ### Product Stock:
 This reports shows the balance quantity in each location:
-![Product page](docs/screenshots/product_master.png?raw=true "Product View")
+![Product Stock page](docs/screenshots/Product_stock.png?raw=true "Product Stock View")
