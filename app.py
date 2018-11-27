@@ -96,6 +96,9 @@ class ModelViewProductMovement(ModelView):
         if is_created:
             conn = engine.connect()
             trans = conn.begin()
+            if not form.from_location.data and not form.to_location.data:
+                conn.close()
+                raise validators.ValidationError('Both "From Location" and "To Location" cannot be empty')
             if form.to_location.data:
                 select_st = db.text(
                     'SELECT * FROM product_stock WHERE location_id = :l AND product_id = :p')
@@ -111,24 +114,20 @@ class ModelViewProductMovement(ModelView):
                         'INSERT INTO product_stock (location_id, product_id, available_stock) VALUES (:l,:p,:qty)')
                     conn.execute(
                         q, qty=form.qty.data, l=form.to_location.data.id, p=form.product.data.id)
-            elif form.from_location.data:
+            if form.from_location.data:
                 select_st = db.text(
                     'SELECT * FROM product_stock WHERE location_id = :l AND product_id = :p')
                 res = conn.execute(
                     select_st, p=form.product.data.id, l=form.from_location.data.id)
                 row_from = res.fetchone()
                 if row_from:
+                    if row_from.available_stock < form.qty.data:
+                        raise validators.ValidationError('Stock of "'+ form.product.data.name +'" available at "'+ form.from_location.data.name +'" is '+ str(row_from.available_stock))
                     q = db.text(
                         'UPDATE product_stock SET available_stock = product_stock.available_stock + (1*:qty) WHERE id = :id')
                     conn.execute(q, qty=-form.qty.data, id=row_from.id)
                 else:
-                    q = db.text(
-                        'INSERT INTO product_stock (location_id, product_id, available_stock) VALUES (:l,:p,:qty)')
-                    conn.execute(
-                        q, qty=-form.qty.data, l=form.from_location.data.id, p=form.product.data.id)
-            else:
-                conn.close()
-                raise ValidationError('Both from and to cannot be empty')
+                    raise validators.ValidationError('Zero Stock of "'+ form.product.data.name +'" available at "'+ form.from_location.data.name +'"')
             trans.commit()
             conn.close()
         else:
@@ -141,11 +140,36 @@ class ModelViewProductMovement(ModelView):
             q = db.text(
                 'UPDATE product_stock SET available_stock = product_stock.available_stock + (1*:qty) WHERE location_id = :l AND product_id = :p')
             if row.from_location_id:
-                conn.execute(q, qty=(int(row.qty)-int(form.qty.data)),
+                select_st = db.text(
+                    'SELECT * FROM product_stock WHERE location_id = :l AND product_id = :p')
+                res = conn.execute(
+                    select_st, p=row.product_id, l=row.from_location_id)
+                row_from = res.fetchone()
+                if row_from:
+                    if row_from.available_stock + (int(row.qty)-int(form.qty.data)) < 0:
+                        raise validators.ValidationError('Insufficient stock at "from_location". Stock available is: '+ str(row_from.available_stock))
+                    conn.execute(q, qty=(int(row.qty)-int(form.qty.data)),
                              l=row.from_location_id, p=row.product_id)
+                else:
+                    raise validators.ValidationError('Insufficient stock at "from_location". Stock available is: 0')
             if row.to_location_id:
-                conn.execute(q, qty=(int(form.qty.data)-int(row.qty)),
+                select_st = db.text(
+                    'SELECT * FROM product_stock WHERE location_id = :l AND product_id = :p')
+                res = conn.execute(
+                    select_st, p=row.product_id, l=row.to_location_id)
+                row_to = res.fetchone()
+                if row_to:
+                    if (row_to.available_stock + int(form.qty.data)-int(row.qty)) < 0:
+                        raise validators.ValidationError('Insufficient stock at "to_location". Stock available is: '+ str(row_to.available_stock))
+                    conn.execute(q, qty=(int(form.qty.data)-int(row.qty)),
                              l=row.to_location_id, p=row.product_id)
+                else:
+                    if int(form.qty.data)-int(row.qty) < 0:
+                        raise validators.ValidationError('Insufficient stock at "to_location". Stock available is: 0')
+                    q = db.text(
+                        'INSERT INTO product_stock (location_id, product_id, available_stock) VALUES (:l,:p,:qty)')
+                    conn.execute(
+                        q, qty=(int(form.qty.data)-int(row.qty)), l=row.to_location_id, p=row.product_id)
             trans.commit()
             conn.close()
 
@@ -156,7 +180,7 @@ class ModelViewProductStock(ModelView):
     column_exclude_list = ['time_created', 'time_updated']
     column_sortable_list = ('available_stock', )
     column_default_sort = 'product_id'
-    page_size = 20
+    page_size = 35
     can_export = True
     export_types = ['csv']
 
