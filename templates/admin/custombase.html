@@ -1,0 +1,24 @@
+{% extends 'admin/base.html' %}
+
+{% block head_tail %}
+{% if config['GA_TRACKING_ID'] %}
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id={{config['GA_TRACKING_ID']}}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', "{{config['GA_TRACKING_ID']}}");
+</script>
+{% endif %}
+{% endblock %}
+
+{% block tail %}
+<footer class="container" style="padding-top: 130px;padding-bottom: 0px;">
+  <p>
+    Developed by: Karthikeyan S<br>
+    Source Code: <a tabindex="-1" href="https://github.com/karthikeyan5/Flaskentory">
+      karthikeyan5/Flaskentory</a>.</p>
+</footer>
+{% endblock %}

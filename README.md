@@ -1,8 +1,8 @@
 # Flaskentory
 
-An Inventory Management Web Application made with [Flask](http://flask.pocoo.org/) and [PostgreSQL](https://www.postgresql.org)
+A Sample Inventory Management Web Application made with [Flask](http://flask.pocoo.org/) and [PostgreSQL](https://www.postgresql.org)
 
-Visit https://flaskentory.herokuapp.com/ for live version of the application.
+Visit https://flaskentory.herokuapp.com/ for demo version of the application.
 
 ### Instruction to install and run the application.
 1. Install python3.7.

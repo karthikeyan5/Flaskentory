@@ -10,9 +10,10 @@ app = Flask(__name__)
 app.config['demo'] = os.environ.get('IS_DEMO', True)
 app.config['is_production'] = os.environ.get('IS_PRODUCTION', False)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '0012345679')
+app.config['GA_TRACKING_ID'] = os.environ.get('GA_TRACKING_ID', None)
 
 # set bootswatch theme
-app.config['FLASK_ADMIN_SWATCH'] = 'lumen'
+app.config['FLASK_ADMIN_SWATCH'] = os.environ.get('FLASK_ADMIN_SWATCH', 'lumen')#'lumen' 'paper'
 
 # db config
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
@@ -248,7 +249,7 @@ class ProductStock(db.Model):
 
 
 admin = Admin(app, name='Inventory Management',
-              template_mode='bootstrap3', url='/')
+              template_mode='bootstrap3', url='/', base_template='admin/custombase.html')
 admin.add_view(ModelViewProductMovement(
     ProductMovement, db.session, name='Product Movement'))
 admin.add_view(ModelViewProductStock(
