@@ -1,3 +1,5 @@
+> Note: This software has been written only for technology demonstration purpose. If you are looking for a real Inventory Management System or a Full-fledged ERP, head over to the awesome [ERPNext](https://github.com/frappe/erpnext).
+
 # Flaskentory
 
 A Sample Inventory Management Web Application made with [Flask](http://flask.pocoo.org/) and [PostgreSQL](https://www.postgresql.org)
